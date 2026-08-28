@@ -21,23 +21,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Java JDK 17
+      - name: Set up Java JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platforms;android-36 build-tools;36.0.0'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
 
-      - name: Grant execute permission for gradlew
+      - name: Accept Android SDK Licenses
         run: |
-          if [ -f "./gradlew" ]; then chmod +x ./gradlew; fi
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
       - name: Prepare Signing Keystore
         env:
@@ -46,8 +43,10 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.keystore"
             echo "KEYSTORE_PATH=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
+            echo "Keystore decoded successfully."
           else
             echo "KEYSTORE_PATH=${{ github.workspace }}/debug.keystore" >> $GITHUB_ENV
+            echo "No KEYSTORE_BASE64 secret provided, using fallback keystore."
           fi
 
       - name: Build Android Release and Debug APKs
@@ -55,13 +54,12 @@ jobs:
           STORE_PASSWORD: ${{ secrets.CM_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.CM_KEY_ALIAS || secrets.KEY_ALIAS || 'upload' }}
           KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD || secrets.KEY_PASSWORD }}
+          CM_KEYSTORE_PASSWORD: ${{ secrets.CM_KEYSTORE_PASSWORD }}
+          CM_KEY_ALIAS: ${{ secrets.CM_KEY_ALIAS }}
+          CM_KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          if [ -f "./gradlew" ]; then
-            ./gradlew assembleDebug assembleRelease bundleRelease --no-daemon --stacktrace
-          else
-            gradle assembleDebug assembleRelease bundleRelease --no-daemon --stacktrace
-          fi
+          gradle assembleDebug assembleRelease bundleRelease --stacktrace
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
