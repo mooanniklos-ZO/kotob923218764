@@ -36,20 +36,33 @@ jobs:
         run: |
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
-      - name: Prepare Signing Keystore
+      - name: Prepare Environment & Keystores
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          # 1. Prepare .env file
+          touch .env
+          if [ -n "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
+          fi
+
+          # 2. Decode Debug Keystore if base64 file exists
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > "${{ github.workspace }}/debug.keystore" || true
+          fi
+
+          # 3. Decode Release Keystore from GitHub Secret
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.keystore"
             echo "KEYSTORE_PATH=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
-            echo "Keystore decoded successfully."
+            echo "Release Keystore decoded successfully."
           else
             echo "KEYSTORE_PATH=${{ github.workspace }}/debug.keystore" >> $GITHUB_ENV
-            echo "Using fallback keystore."
+            echo "No KEYSTORE_BASE64 secret provided, using fallback."
           fi
 
-      - name: Build Android Release and Debug APKs
+      - name: Build Android Release APK & AAB Bundle
         env:
           STORE_PASSWORD: ${{ secrets.CM_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.CM_KEY_ALIAS || secrets.KEY_ALIAS || 'upload' }}
@@ -59,20 +72,13 @@ jobs:
           CM_KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          gradle assembleRelease assembleDebug bundleRelease --no-daemon --stacktrace
+          gradle assembleRelease bundleRelease --no-daemon --stacktrace
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: warn
-
-      - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
 
       - name: Upload Release AAB Bundle Artifact
@@ -93,13 +99,12 @@ jobs:
             تم بناء التطبيق وتوقيعه بنجاح عبر GitHub Actions.
             
             ### 📥 روابط التحميل المباشرة:
-            - **تطبيق الأندرويد (Release APK)**: جاهز للتثبيت الفوري على الهاتف.
+            - **تطبيق الأندرويد (Release APK)**: جاهز للتثبيت الفوري على هاتفك.
             - **حزمة النشر (AAB Bundle)**: جاهزة للنشر على متجر Google Play.
           draft: false
           prerelease: false
           files: |
             app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk
             app/build/outputs/bundle/release/*.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
