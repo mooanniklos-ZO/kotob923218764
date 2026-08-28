@@ -46,7 +46,7 @@ jobs:
             echo "Keystore decoded successfully."
           else
             echo "KEYSTORE_PATH=${{ github.workspace }}/debug.keystore" >> $GITHUB_ENV
-            echo "No KEYSTORE_BASE64 secret provided, using fallback keystore."
+            echo "Using fallback keystore."
           fi
 
       - name: Build Android Release and Debug APKs
@@ -59,7 +59,7 @@ jobs:
           CM_KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          gradle assembleDebug assembleRelease bundleRelease --stacktrace
+          gradle assembleRelease assembleDebug bundleRelease --no-daemon --stacktrace
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
