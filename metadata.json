@@ -1,0 +1,6 @@
+{
+  "name": "استكفِ مما تزرع",
+  "description": "تطبيق كتاب استكفِ مما تزرع للدكتور مالك الرميمة - دليل الزراعة المنزلية، والري، والجني، والمحاصيل واستصلاح المساحات.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,32 @@
+package com.example.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+// Light Theme Colors (Lush Organic Agricultural Palette)
+val EmeraldPrimary = Color(0xFF1B5E20)
+val EmeraldPrimaryContainer = Color(0xFFC8E6C9)
+val EmeraldOnPrimary = Color(0xFFFFFFFF)
+val EmeraldSecondary = Color(0xFF2E7D32)
+val EmeraldSecondaryContainer = Color(0xFFDCEDC8)
+val LeafGreen = Color(0xFF43A047)
+val BrightLime = Color(0xFF7CB342)
+val HarvestGold = Color(0xFFD48806)
+val EarthBrown = Color(0xFF5D4037)
+val WarmClay = Color(0xFF8D6E63)
+val WarmParchment = Color(0xFFFBF9F1)
+val WarmSurface = Color(0xFFFFFFFF)
+val WarmSurfaceVariant = Color(0xFFF1EFE6)
+val TextDark = Color(0xFF1E2A1F)
+val TextMuted = Color(0xFF5A6D5E)
+
+// Dark Theme Colors (Deep Emerald Night Palette)
+val EmeraldDarkPrimary = Color(0xFF81C784)
+val EmeraldDarkPrimaryContainer = Color(0xFF1B5E20)
+val EmeraldDarkOnPrimary = Color(0xFF00330E)
+val EmeraldDarkSecondary = Color(0xFFA5D6A7)
+val EmeraldDarkBackground = Color(0xFF0C1710)
+val EmeraldDarkSurface = Color(0xFF14241B)
+val EmeraldDarkSurfaceVariant = Color(0xFF1E3528)
+val DarkTextLight = Color(0xFFE8F5E9)
+val DarkTextMuted = Color(0xFFA4C4AA)
+val DarkGoldAccent = Color(0xFFFFD54F)
