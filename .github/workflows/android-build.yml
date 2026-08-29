@@ -21,10 +21,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Java JDK 21
+      - name: Set up Java JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Gradle
@@ -35,76 +35,102 @@ jobs:
       - name: Accept Android SDK Licenses
         run: |
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Prepare Environment & Keystores
+      - name: Prepare Environment & Real Release Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # 1. Prepare .env file
-          touch .env
+          set -euo pipefail
+
+          test -n "$KEYSTORE_BASE64" || {
+            echo "ERROR: KEYSTORE_BASE64 GitHub Secret is missing."
+            echo "A real release APK will never be produced with the debug keystore."
+            exit 1
+          }
+
+          test -n "${{ secrets.CM_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}" || {
+            echo "ERROR: release keystore password secret is missing."
+            exit 1
+          }
+          test -n "${{ secrets.CM_KEY_ALIAS || secrets.KEY_ALIAS }}" || {
+            echo "ERROR: release key alias secret is missing."
+            exit 1
+          }
+          test -n "${{ secrets.CM_KEY_PASSWORD || secrets.KEY_PASSWORD }}" || {
+            echo "ERROR: release key password secret is missing."
+            exit 1
+          }
+
+          : > .env
           if [ -n "$GEMINI_API_KEY" ]; then
-            echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
+            printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY" >> .env
           fi
 
-          # 2. Decode Debug Keystore if base64 file exists
-          if [ -f "debug.keystore.base64" ]; then
-            base64 -d debug.keystore.base64 > "${{ github.workspace }}/debug.keystore" || true
-          fi
-
-          # 3. Decode Release Keystore from GitHub Secret
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.keystore"
-            echo "KEYSTORE_PATH=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
-            echo "Release Keystore decoded successfully."
-          else
-            echo "KEYSTORE_PATH=${{ github.workspace }}/debug.keystore" >> $GITHUB_ENV
-            echo "No KEYSTORE_BASE64 secret provided, using fallback."
-          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/release.keystore"
+          test -s "${{ github.workspace }}/release.keystore"
+          echo "KEYSTORE_PATH=${{ github.workspace }}/release.keystore" >> "$GITHUB_ENV"
+          echo "Real release keystore prepared successfully."
 
       - name: Build Android Release APK & AAB Bundle
         env:
           STORE_PASSWORD: ${{ secrets.CM_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.CM_KEY_ALIAS || secrets.KEY_ALIAS || 'upload' }}
+          KEY_ALIAS: ${{ secrets.CM_KEY_ALIAS || secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD || secrets.KEY_PASSWORD }}
-          CM_KEYSTORE_PASSWORD: ${{ secrets.CM_KEYSTORE_PASSWORD }}
-          CM_KEY_ALIAS: ${{ secrets.CM_KEY_ALIAS }}
-          CM_KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          gradle assembleRelease bundleRelease --no-daemon --stacktrace
+          set -euo pipefail
+          gradle clean assembleRelease bundleRelease --no-daemon --stacktrace
+
+      - name: Verify Real Release Outputs
+        run: |
+          set -euo pipefail
+          test -f app/build/outputs/apk/release/app-release.apk
+          test -f app/build/outputs/bundle/release/app-release.aab
+          echo "=== REAL RELEASE APK ==="
+          ls -lh app/build/outputs/apk/release/app-release.apk
+          sha256sum app/build/outputs/apk/release/app-release.apk
+          echo "=== REAL RELEASE AAB ==="
+          ls -lh app/build/outputs/bundle/release/app-release.aab
+          sha256sum app/build/outputs/bundle/release/app-release.aab
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: warn
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload Release AAB Bundle Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
-          path: app/build/outputs/bundle/release/*.aab
-          if-no-files-found: warn
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Publish GitHub Release with APK & AAB
+      - name: Publish GitHub Release with Real APK & AAB
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: "إصدار تطبيق إستكفي مما تزرع v1.0.${{ github.run_number }}"
           body: |
-            ## 🌿 تطبيق كتاب «إستكفي مما تزرع» - للدكتور مالك عبدالرحمن الرميمة
-            تم بناء التطبيق وتوقيعه بنجاح عبر GitHub Actions.
-            
-            ### 📥 روابط التحميل المباشرة:
-            - **تطبيق الأندرويد (Release APK)**: جاهز للتثبيت الفوري على هاتفك.
-            - **حزمة النشر (AAB Bundle)**: جاهزة للنشر على متجر Google Play.
+            ## 🌿 تطبيق كتاب «إستكفي مما تزرع»
+
+            تم بناء هذه النسخة من المصدر الحقيقي للمشروع وتوقيعها بمفتاح Release الحقيقي.
+
+            ### 📥 التحميل
+            - **Release APK:** التطبيق الحقيقي الجاهز للتثبيت على Android.
+            - **Release AAB:** حزمة النشر الحقيقية لمتجر Google Play.
+
+            لا يتم استخدام debug keystore في هذا الإصدار.
           draft: false
           prerelease: false
           files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
