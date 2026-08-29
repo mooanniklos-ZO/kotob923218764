@@ -68,7 +68,7 @@ jobs:
             printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY" >> .env
           fi
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/release.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "${{ github.workspace }}/release.keystore"
           test -s "${{ github.workspace }}/release.keystore"
           echo "KEYSTORE_PATH=${{ github.workspace }}/release.keystore" >> "$GITHUB_ENV"
           echo "Real release keystore prepared successfully."
@@ -81,6 +81,17 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
+
+          # GitHub Secrets are sometimes pasted with a trailing CR/LF. Strip only
+          # surrounding line breaks so the actual keystore credentials are exact.
+          export STORE_PASSWORD="$(printf '%s' "$STORE_PASSWORD" | tr -d '\r\n')"
+          export KEY_ALIAS="$(printf '%s' "$KEY_ALIAS" | tr -d '\r\n')"
+          export KEY_PASSWORD="$(printf '%s' "$KEY_PASSWORD" | tr -d '\r\n')"
+
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+
           gradle clean assembleRelease bundleRelease --no-daemon --stacktrace
 
       - name: Verify Real Release Outputs
