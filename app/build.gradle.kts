@@ -10,45 +10,40 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.aistudio.istakfimmazraa.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+    versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "1"}"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
     create("release") {
-      val keystoreEnv = System.getenv("KEYSTORE_PATH")
-      val keystoreCandidate = when {
-        !keystoreEnv.isNullOrBlank() && file(keystoreEnv).exists() -> file(keystoreEnv)
-        file("${rootDir}/release.keystore").exists() -> file("${rootDir}/release.keystore")
-        file("${rootDir}/my-upload-key.jks").exists() -> file("${rootDir}/my-upload-key.jks")
-        file("${rootDir}/debug.keystore").exists() -> file("${rootDir}/debug.keystore")
-        else -> null
+      val keystorePath = System.getenv("KEYSTORE_PATH")
+      require(!keystorePath.isNullOrBlank()) {
+        "KEYSTORE_PATH is required for a real release build. Refusing to sign the release APK with the debug keystore."
       }
-      if (keystoreCandidate != null && keystoreCandidate.exists()) {
-        storeFile = keystoreCandidate
+      val keystoreFile = file(keystorePath)
+      require(keystoreFile.exists()) {
+        "Release keystore was not found at: $keystorePath"
       }
+      storeFile = keystoreFile
 
-      val storePass = System.getenv("STORE_PASSWORD") ?: System.getenv("CM_KEYSTORE_PASSWORD")
-      val kAlias = System.getenv("KEY_ALIAS") ?: System.getenv("CM_KEY_ALIAS")
-      val kPass = System.getenv("KEY_PASSWORD") ?: System.getenv("CM_KEY_PASSWORD")
+      val storePass = System.getenv("STORE_PASSWORD")
+      val kAlias = System.getenv("KEY_ALIAS")
+      val kPass = System.getenv("KEY_PASSWORD")
+      require(!storePass.isNullOrBlank()) { "STORE_PASSWORD is required for the release signing key." }
+      require(!kAlias.isNullOrBlank()) { "KEY_ALIAS is required for the release signing key." }
+      require(!kPass.isNullOrBlank()) { "KEY_PASSWORD is required for the release signing key." }
 
-      if (!storePass.isNullOrBlank() && !kAlias.isNullOrBlank() && !kPass.isNullOrBlank()) {
-        storePassword = storePass
-        keyAlias = kAlias
-        keyPassword = kPass
-      } else {
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
-      }
+      storePassword = storePass
+      keyAlias = kAlias
+      keyPassword = kPass
     }
     create("debugConfig") {
       val dbg = file("${rootDir}/debug.keystore")
@@ -90,8 +85,6 @@ android {
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
@@ -100,17 +93,10 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
-// Some unused dependencies are commented out below instead of being removed.
-// This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
-  // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
-  // implementation(libs.androidx.camera.camera2)
-  // implementation(libs.androidx.camera.core)
-  // implementation(libs.androidx.camera.lifecycle)
-  // implementation(libs.androidx.camera.view)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
@@ -118,25 +104,13 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
-  // implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
-  // implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
-  // implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
-  // Uncomment to use Firestore:
-  // implementation(libs.firebase.firestore)
-
-  // Uncomment ALL FOUR of the following dependencies together to use Firebase Auth and Google
-  // Sign-In via Credential Manager:
-  // implementation(libs.firebase.auth)
-  // implementation(libs.androidx.credentials)
-  // implementation(libs.androidx.credentials.play.services)
-  // implementation(libs.googleid)
   implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
@@ -144,7 +118,6 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
